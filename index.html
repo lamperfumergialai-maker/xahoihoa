@@ -13,6 +13,8 @@
             --success-bg: #dcfce7;
             --warning: #b45309;
             --warning-bg: #fef3c7;
+            --danger: #b91c1c;
+            --danger-bg: #fef2f2;
             --text-dark: #1e293b;
             --text-muted: #64748b;
             --border: #e2e8f0;
@@ -64,6 +66,65 @@
         .header .subtitle {
             color: var(--text-muted);
             font-size: 15px;
+            font-style: italic;
+        }
+
+        /* Khung nổi bật: Đơn vị chưa xã hội hóa theo tháng */
+        .month-alert-box {
+            background: #ffffff;
+            border: 1px solid #fecaca;
+            border-left: 5px solid var(--danger);
+            border-radius: 10px;
+            padding: 18px 22px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 6px rgba(185, 28, 28, 0.08);
+        }
+
+        .month-alert-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .month-alert-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: var(--danger);
+            text-transform: uppercase;
+        }
+
+        .month-count-badge {
+            background: var(--danger-bg);
+            color: var(--danger);
+            border: 1px solid #fecaca;
+            padding: 3px 12px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .month-unit-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .unit-tag {
+            background: var(--danger-bg);
+            color: #7f1d1d;
+            border: 1px solid #fca5a5;
+            padding: 5px 12px;
+            border-radius: 6px;
+            font-weight: bold;
+            font-size: 15px;
+        }
+
+        .unit-empty {
+            color: var(--success);
+            font-weight: bold;
             font-style: italic;
         }
 
@@ -257,8 +318,20 @@
         <div>
             <h1>Theo dõi Tiến độ Xã hội hóa</h1>
             <div class="subtitle">Dữ liệu được cập nhật tự động từ hệ thống</div>
+            <div class="subtitle">&copy; Đội 4 - PV01 (039.217.6983)</div>
         </div>
         <div id="lastUpdated" class="subtitle"></div>
+    </div>
+
+    <!-- KHUNG THEO DÕI ĐƠN VỊ CHƯA XÃ HỘI HÓA TRONG THÁNG -->
+    <div class="month-alert-box">
+        <div class="month-alert-header">
+            <div class="month-alert-title" id="monthAlertTitle">Đơn vị chưa xã hội hóa trong tháng 11</div>
+            <span class="month-count-badge" id="monthAlertCount">0 đơn vị</span>
+        </div>
+        <div class="month-unit-list" id="monthUnitList">
+            <span style="color: #64748b; font-style: italic;">Đang kiểm tra dữ liệu...</span>
+        </div>
     </div>
 
     <!-- 3 Thẻ bấm lọc dữ liệu -->
@@ -317,6 +390,12 @@
 </div>
 
 <script>
+    // =========================================================================
+    // CẤU HÌNH THÁNG CẦN THEO DÕI (Khi sang tháng 12, chỉ cần sửa số 11 thành 12)
+    // =========================================================================
+    const THANG_THEO_DOI = 11; 
+    // =========================================================================
+
     let allData = [];
     let currentStatus = 'all';
 
@@ -330,6 +409,7 @@
             const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
             allData = XLSX.utils.sheet_to_json(firstSheet);
 
+            renderMonthAlert();
             updateStats();
             renderTable(allData);
             
@@ -340,6 +420,41 @@
             document.getElementById('tableBody').innerHTML = 
                 `<tr><td colspan="4" class="empty-state" style="color:#dc2626;">Lỗi tải dữ liệu: ${error.message}</td></tr>`;
         }
+    }
+
+    // Kiểm tra cột thangxahoihoa có khớp với THANG_THEO_DOI không (hỗ trợ cả "11", "Tháng 11", "11/2026"...)
+    function isMatchTargetMonth(val, targetMonth) {
+        if (val === undefined || val === null) return false;
+        const str = String(val).trim().toLowerCase();
+        const targetStr = String(targetMonth);
+        
+        if (str === targetStr || str === `tháng ${targetStr}` || str === `thang ${targetStr}`) {
+            return true;
+        }
+        // Trường hợp nhập dạng 11/2026 hoặc 11-2026
+        const parts = str.split(/[^0-9]+/).filter(Boolean);
+        return parts.length > 0 && Number(parts[0]) === Number(targetMonth);
+    }
+
+    function renderMonthAlert() {
+        document.getElementById('monthAlertTitle').textContent = 
+            `Đơn vị chưa xã hội hóa trong tháng ${THANG_THEO_DOI}`;
+
+        const chuaTrongThang = allData.filter(row => 
+            row.xahoihoa == 0 && isMatchTargetMonth(row.thangxahoihoa, THANG_THEO_DOI)
+        );
+
+        document.getElementById('monthAlertCount').textContent = `${chuaTrongThang.length} đơn vị`;
+
+        const listContainer = document.getElementById('monthUnitList');
+        if (chuaTrongThang.length === 0) {
+            listContainer.innerHTML = `<span class="unit-empty">✓ Tất cả đơn vị trong tháng ${THANG_THEO_DOI} đều đã hoàn thành xã hội hóa (hoặc không có đơn vị nào chưa thực hiện).</span>`;
+            return;
+        }
+
+        listContainer.innerHTML = chuaTrongThang.map((row, idx) => 
+            `<span class="unit-tag">${idx + 1}. ${row.donvi ?? 'Chưa rõ tên'}</span>`
+        ).join('');
     }
 
     function updateStats() {
